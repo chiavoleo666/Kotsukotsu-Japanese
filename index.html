@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kotsukotsu Japanese</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#e9edf2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1524" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a phone-first study desk. One scrolling column over a fixed tab bar;
+   every Japanese glyph sits in a genko-yoshi (manuscript paper) cell, stamped with a hanko seal. */
+:root{
+  --paper:#e9edf2; --surface:#ffffff; --ink:#14213d; --muted:#586581; --line:#cdd5e0;
+  --indigo:#27418f; --on-indigo:#ffffff; --seal:#d43d2f; --guide:#b9c4d6;
+  --good:#23775a; --good-bg:#dff1e9; --bad:#a12d55; --bad-bg:#f6dfe7; --warn:#96660d;
+  --jp:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
+  --ui:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0e1524; --surface:#172037; --ink:#e9edf6; --muted:#97a4c0; --line:#2b3857;
+    --indigo:#9db8ff; --on-indigo:#0e1524; --seal:#f0604f; --guide:#3a496e;
+    --good:#6fd0a6; --good-bg:#153a31; --bad:#f08fb0; --bad-bg:#44182b; --warn:#e3b55a;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0e1524; --surface:#172037; --ink:#e9edf6; --muted:#97a4c0; --line:#2b3857;
+  --indigo:#9db8ff; --on-indigo:#0e1524; --seal:#f0604f; --guide:#3a496e;
+  --good:#6fd0a6; --good-bg:#153a31; --bad:#f08fb0; --bad-bg:#44182b; --warn:#e3b55a;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--ui);font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%}
+button,select{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:3px solid var(--indigo);outline-offset:2px}
+#app{height:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column}
+main{flex:1;overflow-y:auto;padding:20px 16px 28px;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{margin:0;text-wrap:balance}
+h1{font-family:var(--jp);font-weight:700;font-size:28px;line-height:1.15;letter-spacing:.01em}
+h2{font-size:13px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+p{margin:0}
+.muted{color:var(--muted)} .small{font-size:13px} .num{font-variant-numeric:tabular-nums}
+.jp{font-family:var(--jp)}
+
+/* tab bar: four manuscript cells */
+nav{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);background:var(--surface);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
+nav a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;text-decoration:none;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:8px}
+nav a b{font-family:var(--jp);font-size:20px;line-height:1;width:34px;height:34px;display:grid;place-items:center;border:1px solid var(--line);border-radius:4px;font-weight:700}
+nav a[aria-current="page"]{color:var(--ink)}
+nav a[aria-current="page"] b{background:var(--indigo);color:var(--on-indigo);border-color:var(--indigo)}
+
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+.seal{flex:none;width:58px;height:58px;border:2.5px solid var(--seal);color:var(--seal);border-radius:6px;display:grid;place-items:center;font-family:var(--jp);font-weight:700;line-height:1;transform:rotate(-4deg);text-align:center}
+.seal span{font-size:22px;display:block} .seal small{font-size:10px;font-family:var(--ui);letter-spacing:.08em;display:block;margin-top:3px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.stack{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;align-items:center;gap:12px}
+.row .grow{flex:1;min-width:0}
+.task{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;text-decoration:none;color:inherit}
+.task .tick{flex:none;width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:14px;font-weight:700;color:transparent}
+.task.done .tick{background:var(--good);border-color:var(--good);color:var(--surface)}
+.task strong{display:block}
+.task .go{font-weight:700;color:var(--indigo);font-size:14px;white-space:nowrap}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--indigo);border-radius:3px}
+
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;align-items:end;height:92px}
+.week div{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%;font-size:11px;color:var(--muted)}
+.week i{display:block;width:100%;max-width:26px;border-radius:3px 3px 0 0;background:var(--indigo);min-height:2px}
+.week .zero i{background:var(--line)}
+.week .now{color:var(--ink);font-weight:700}
+
+.road{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.road li{display:grid;grid-template-columns:44px 1fr;gap:12px;padding:10px 0;border-top:1px dashed var(--line)}
+.road li:first-child{border-top:0;padding-top:0}
+.road .lv{font-family:var(--jp);font-weight:700;font-size:17px;width:44px;height:44px;border:1px solid var(--line);border-radius:4px;display:grid;place-items:center;color:var(--muted)}
+.road .here .lv{border:2px solid var(--seal);color:var(--seal)}
+.road strong{display:block}
+
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:12px 14px;font-weight:700;min-height:48px}
+.btn.primary{background:var(--indigo);border-color:var(--indigo);color:var(--on-indigo)}
+.btn.wide{width:100%}
+.btn:disabled{opacity:.45;cursor:default}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px;min-height:40px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+
+/* the genko cell: where every glyph is shown */
+.cell{position:relative;background:var(--surface);border:1.5px solid var(--ink);border-radius:4px;display:grid;place-items:center;text-align:center;padding:22px 14px;min-height:210px;
+  background-image:linear-gradient(to right,transparent calc(50% - .5px),var(--guide) calc(50% - .5px),var(--guide) calc(50% + .5px),transparent calc(50% + .5px)),linear-gradient(to bottom,transparent calc(50% - .5px),var(--guide) calc(50% - .5px),var(--guide) calc(50% + .5px),transparent calc(50% + .5px));
+  background-size:100% 8px,8px 100%;background-repeat:repeat-y,repeat-x;background-position:0 0,0 0}
+.cell .glyph{font-family:var(--jp);font-weight:500;line-height:1.25;overflow-wrap:anywhere;position:relative;background:var(--surface);padding:2px 10px;border-radius:4px}
+.cell .tag{position:absolute;top:8px;left:10px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--surface);padding:0 4px}
+.cell .stamp{position:absolute;top:8px;right:8px;width:30px;height:30px;border:2px solid var(--seal);color:var(--seal);border-radius:4px;font-family:var(--jp);font-weight:700;display:grid;place-items:center;font-size:15px;transform:rotate(5deg);background:var(--surface)}
+.answer{border-top:1px dashed var(--line);padding-top:12px;display:flex;flex-direction:column;gap:4px;align-items:center;text-align:center}
+.answer .kj{font-family:var(--jp);font-size:26px}
+.answer .en{font-size:18px;font-weight:700}
+.grades{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.grades .btn{padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:0;font-size:14px}
+.grades .btn small{font-weight:500;color:var(--muted);font-size:12px}
+.grades .g0{border-color:var(--bad);color:var(--bad)} .grades .g2{border-color:var(--good);color:var(--good)}
+
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.opt{border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:14px 8px;min-height:56px;font-size:19px;font-weight:700;overflow-wrap:anywhere}
+.opt.jp{font-family:var(--jp);font-size:21px;font-weight:500}
+.opt.right{border-color:var(--good);background:var(--good-bg);color:var(--good)}
+.opt.wrong{border-color:var(--bad);background:var(--bad-bg);color:var(--bad)}
+.verdict{border-radius:10px;padding:12px 14px;font-size:15px}
+.verdict.ok{background:var(--good-bg);color:var(--good)} .verdict.no{background:var(--bad-bg);color:var(--bad)}
+.verdict b{display:block}
+.verdict span{color:var(--ink)}
+.tiles{display:flex;flex-wrap:wrap;gap:8px;min-height:52px;align-items:center}
+.tiles.slot{border:1.5px dashed var(--line);border-radius:10px;padding:8px}
+.tile{font-family:var(--jp);font-size:20px;border:1.5px solid var(--ink);background:var(--surface);border-radius:6px;padding:8px 12px;min-height:44px}
+.note{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;padding:12px 0;border-top:1px dashed var(--line)}
+.note:first-child{border-top:0;padding-top:0}
+.note .n{font-family:var(--jp);font-weight:700;color:var(--seal);font-size:18px;grid-row:span 3}
+.note .pat{font-family:var(--jp);font-weight:700;font-size:19px}
+.note .ex{font-family:var(--jp);font-size:17px}
+.pad{position:relative;aspect-ratio:1;width:100%;max-width:340px;margin:0 auto;padding:0;min-height:0}
+.pad .ghost{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--jp);font-size:min(62vw,230px);line-height:1;color:var(--guide);pointer-events:none;user-select:none}
+.pad canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;border-radius:4px}
+.set label{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px dashed var(--line)}
+.set label:first-child{border-top:0}
+.set select{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 10px;min-height:40px}
+.set input[type=checkbox]{width:22px;height:22px;accent-color:var(--indigo)}
+.sync{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700}
+.sync::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--warn)}
+.sync.on::before{background:var(--good)}
+@media (prefers-reduced-motion:no-preference){.bar i,.week i{transition:width .3s,height .3s}}
+</style>
+</head>
+<body>
+<div id="app">
+  <main id="view"></main>
+  <nav aria-label="Sections">
+    <a href="#today" data-tab="today"><b>今</b>Today</a>
+    <a href="#cards" data-tab="cards"><b>札</b>Cards</a>
+    <a href="#grammar" data-tab="grammar"><b>文</b>Grammar</a>
+    <a href="#kana" data-tab="kana"><b>字</b>Kana</a>
+  </nav>
+</div>
+<script>
+"use strict";
+/* ---------- Content (original material; units follow the grammar scope of Genki I lessons 1-3) ---------- */
+const UNITS = {
+  1:{name:"Introductions", scope:"Genki I · L1"},
+  2:{name:"Things and places", scope:"Genki I · L2"},
+  3:{name:"Daily actions", scope:"Genki I · L3"}
+};
+// kana|kanji form|meaning
+const VOCAB = {
+1:`わたし|私|I, me
+がくせい|学生|student
+せんせい|先生|teacher
+だいがく|大学|university
+にほん|日本|Japan
+にほんご|日本語|Japanese (language)
+えいご|英語|English (language)
+ともだち|友達|friend
+なまえ|名前|name
+せんこう|専攻|major (field of study)
+かいしゃいん|会社員|office worker
+エンジニア||engineer
+イタリア||Italy
+いま|今|now
+ごぜん|午前|a.m.
+ごご|午後|p.m.
+はん|半|half past
+でんわ|電話|telephone
+ばんごう|番号|number
+なん / なに|何|what
+はい||yes
+いいえ||no
+おはよう||good morning
+こんにちは||hello, good afternoon
+こんばんは||good evening
+ありがとう||thank you
+すみません||excuse me, I'm sorry
+はじめまして||nice to meet you (first meeting)`,
+2:`これ||this one (near me)
+それ||that one (near you)
+あれ||that one over there
+どれ||which one
+ここ||here
+そこ||there (near you)
+あそこ||over there
+どこ||where
+だれ|誰|who
+ほん|本|book
+かばん||bag
+くつ|靴|shoes
+とけい|時計|watch, clock
+かさ|傘|umbrella
+さいふ|財布|wallet
+じてんしゃ|自転車|bicycle
+くるま|車|car
+さかな|魚|fish
+にく|肉|meat
+やさい|野菜|vegetable
+みず|水|water
+おちゃ|お茶|green tea
+いくら||how much
+えん|円|yen
+たかい|高い|expensive, high
+やすい|安い|cheap
+おいしい||tasty
+ぎんこう|銀行|bank
+としょかん|図書館|library
+トイレ||restroom
+メニュー||menu`,
+3:`いく|行く|to go
+くる|来る|to come
+かえる|帰る|to go back, return
+たべる|食べる|to eat
+のむ|飲む|to drink
+みる|見る|to see, watch
+きく|聞く|to listen, ask
+よむ|読む|to read
+はなす|話す|to speak
+する||to do
+べんきょうする|勉強する|to study
+おきる|起きる|to get up
+ねる|寝る|to sleep, go to bed
+えいが|映画|movie
+おんがく|音楽|music
+ざっし|雑誌|magazine
+あさごはん|朝ご飯|breakfast
+ひるごはん|昼ご飯|lunch
+ばんごはん|晩ご飯|dinner
+うち|家|home, house
+がっこう|学校|school
+きょう|今日|today
+あした|明日|tomorrow
+まいにち|毎日|every day
+しゅうまつ|週末|weekend
+よく||often
+ときどき|時々|sometimes
+あまり||not much (with negative)
+ぜんぜん|全然|not at all (with negative)
+いい||good
+はやい|早い|early`
+};
+// kanji|reading|meaning
+const KANJI = `一|いち|one
+二|に|two
+三|さん|three
+四|よん / し|four
+五|ご|five
+六|ろく|six
+七|なな / しち|seven
+八|はち|eight
+九|きゅう / く|nine
+十|じゅう|ten
+百|ひゃく|hundred
+千|せん|thousand
+万|まん|ten thousand
+円|えん|yen
+時|じ|o'clock, time`.split("\n").map(l=>{const [k,r,en]=l.split("|");return {id:"k-"+k,type:"kanji",front:k,kj:"",read:r,en,u:3};});
+
+const DECK = [];
+for (const u of [1,2,3]) {
+  VOCAB[u].split("\n").forEach(l=>{const [jp,kj,en]=l.split("|");DECK.push({id:"v"+u+"-"+jp,type:"word",front:jp,kj,read:"",en,u});});
+  if (u===3) DECK.push(...KANJI);
+}
+const CARD = Object.fromEntries(DECK.map(c=>[c.id,c]));
+
+const NOTES = {
+1:[["A は B です","わたしは エンジニアです。","I am an engineer. は (read wa) marks the topic; です closes a polite statement."],
+   ["〜ですか","がくせいですか。","Are you a student? Adding か turns a statement into a question."],
+   ["A の B","だいがくの せんせい","A university teacher. の links two nouns; the describing noun comes first."],
+   ["Time: number + じ","いま ごご 3じはんです。","It is 3:30 p.m. now. Watch the irregular hours: よじ (4), しちじ (7), くじ (9)."],
+   ["Dropping the topic","エンジニアです。","Once it is clear who you are talking about, leave わたしは out."]],
+2:[["これ · それ · あれ · どれ","それは いくらですか。","How much is that? This one near me, that one near you, that one over there, which one."],
+   ["この · その · あの + noun","この とけいは 8000えんです。","This watch is 8,000 yen. These forms must be followed by a noun."],
+   ["ここ · そこ · あそこ · どこ","トイレは あそこです。","The restroom is over there. The same three distances, for places."],
+   ["だれの + noun","これは だれの かさですか。","Whose umbrella is this? Answer with わたしのです."],
+   ["Noun も","ともだちも がくせいです。","My friend is a student too. も takes the place of は."],
+   ["Noun じゃないです","これは にくじゃないです。","This is not meat. The negative of です."]],
+3:[["Verb groups and 〜ます","たべる → たべます · のむ → のみます","Ru-verbs drop る. U-verbs move the last sound to the i-row. Irregular: する → します, くる → きます. かえる is a u-verb: かえります."],
+   ["Present tense","あした えいがを みます。","I will watch a movie tomorrow. One tense covers habits and the future. Negative: 〜ません."],
+   ["を · で · に · へ","としょかんで ほんを よみます。","を marks the object, で the place of an action, に a destination or clock time, へ (read e) a destination."],
+   ["Time words without に","きょう うちに かえります。","きょう, あした, まいにち and いつ take no particle. Clock times do: 7じに."],
+   ["〜ませんか","ひるごはんを たべませんか。","Won't you have lunch? A polite invitation."],
+   ["Frequency","ぜんぜん テレビを みません。","まいにち, よく, ときどき go with a positive verb. あまり and ぜんぜん need a negative one."]]
+};
+const mc=(q,en,a,o,why)=>({t:"mc",q,en,a,o,why});
+const bd=(en,tiles,alt)=>({t:"build",en,tiles,alt:alt||[]});
+const QUIZ = {
+1:[mc("わたし＿ がくせいです。","I am a student.","は",["は","を","の","か"],"は marks the topic of the sentence."),
+   mc("たなかさんは せんせいです＿。","Is Tanaka a teacher?","か",["か","は","の","を"],"か at the end makes it a question."),
+   mc("マルコさんは だいがく＿ がくせいです。","Marco is a university student.","の",["の","は","か","を"],"の links だいがく to がくせい."),
+   mc("にほんご＿ せんせい","a teacher of Japanese","の",["の","は","か","です"],"Noun の noun: the first one describes the second."),
+   mc("いま なんじです＿。","What time is it now?","か",["か","の","は","じ"],"Questions end in か."),
+   mc("いま ＿です。","It is 4 o'clock now.","よじ",["よじ","よんじ","しじ","よっじ"],"4 o'clock is irregular: よじ."),
+   mc("いま ＿です。","It is 7 o'clock now.","しちじ",["しちじ","ななじ","なのじ","しっじ"],"7 o'clock is しちじ."),
+   mc("いま ＿です。","It is 9 o'clock now.","くじ",["くじ","きゅうじ","ここのじ","くうじ"],"9 o'clock is くじ, not きゅうじ."),
+   mc("いちじ＿です。","It is half past one.","はん",["はん","ごご","ごぜん","いま"],"はん after the hour means half past."),
+   mc("せんこう＿ なんですか。","What is your major?","は",["は","の","か","を"],"は marks what the question is about."),
+   mc("A: がくせいですか。 B: はい、＿。","A: Are you a student? B: Yes, I am.","そうです",["そうです","いいえ","ですか","なんです"],"はい、そうです: yes, that's right."),
+   mc("＿ はちじです。","It is 8 p.m.","ごご",["ごご","ごぜん","はん","なん"],"ごご is p.m. and comes before the hour."),
+   bd("I am an engineer.",["わたしは","エンジニア","です"]),
+   bd("Is Yamada a student?",["やまださんは","がくせい","です","か"]),
+   bd("My major is English.",["わたしの","せんこうは","えいご","です"]),
+   bd("It is 9 a.m. now.",["いま","ごぜん","くじ","です"]),
+   bd("My friend is a university teacher.",["ともだちは","だいがくの","せんせい","です"])],
+2:[mc("＿は なんですか。","What is that (near you)?","それ",["これ","それ","あれ","どれ"],"それ points at something near the listener."),
+   mc("＿ かばんは いくらですか。","How much is this bag?","この",["この","これ","ここ","だれ"],"Before a noun use この, not これ."),
+   mc("トイレは ＿ですか。","Where is the restroom?","どこ",["どこ","どれ","だれ","なん"],"どこ asks about a place."),
+   mc("これは ＿の くつですか。","Whose shoes are these?","だれ",["だれ","なん","どれ","いくら"],"だれの + noun: whose."),
+   mc("わたしは がくせいです。ともだち＿ がくせいです。","I am a student. My friend is a student too.","も",["も","は","の","か"],"も means too and replaces は."),
+   mc("これは さかな＿。","This is not fish.","じゃないです",["じゃないです","です","ですか","のです"],"Noun + じゃないです is the negative of です."),
+   mc("あれは ＿ですか。","What is that over there?","なん",["なん","だれ","どこ","いくら"],"なん asks what something is."),
+   mc("この とけいは ＿ですか。","How much is this watch?","いくら",["いくら","どれ","なん","どこ"],"いくら asks the price."),
+   mc("ぎんこうは ＿です。","The bank is over there (far from both of us).","あそこ",["あそこ","あれ","あの","そこ"],"あそこ is a place far from both speakers."),
+   mc("A: これは だれの かさですか。 B: ＿です。","A: Whose umbrella is this? B: It's mine.","わたしの",["わたしの","わたしは","わたしも","わたし"],"わたしの on its own means mine."),
+   mc("＿ じてんしゃは わたしのです。","That bicycle over there is mine.","あの",["あの","あれ","あそこ","その"],"あの + noun, for something far from both speakers."),
+   mc("5,000 yen","How do you read it?","ごせんえん",["ごせんえん","ごひゃくえん","ごまんえん","ごじゅうえん"],"せん is thousand, ひゃく hundred, まん ten thousand."),
+   mc("300","How do you read it?","さんびゃく",["さんびゃく","さんひゃく","さんぴゃく","さんせん"],"ひゃく becomes びゃく after さん."),
+   mc("600","How do you read it?","ろっぴゃく",["ろっぴゃく","ろくひゃく","ろくびゃく","ろっびゃく"],"ろく + ひゃく contracts to ろっぴゃく."),
+   bd("That is my umbrella.",["それは","わたしの","かさ","です"]),
+   bd("How much is this book?",["この","ほんは","いくら","ですか"]),
+   bd("The library is over there.",["としょかんは","あそこ","です"]),
+   bd("Whose bag is that over there?",["あれは","だれの","かばん","ですか"]),
+   bd("This is not meat.",["これは","にく","じゃないです"]),
+   bd("That car is expensive too.",["その","くるまも","たかい","です"])],
+3:[mc("わたしは まいにち おちゃ＿ のみます。","I drink tea every day.","を",["を","で","に","は"],"を marks the thing the action is done to."),
+   mc("としょかん＿ ほんを よみます。","I read books at the library.","で",["で","に","を","へ"],"で marks where an action takes place."),
+   mc("あした だいがく＿ いきます。","I will go to the university tomorrow.","に",["に","で","を","の"],"に marks the destination."),
+   mc("7じ＿ おきます。","I get up at 7.","に",["に","で","を","は"],"Clock times take に."),
+   mc("きょう＿ えいがを みます。","I will watch a movie today.","(no particle)",["(no particle)","に","で","を"],"きょう, あした and まいにち take no particle."),
+   mc("うち＿ かえります。","I go back home.","へ",["へ","を","で","も"],"へ marks the direction of movement."),
+   mc("わたしは ぜんぜん テレビを ＿。","I never watch TV.","みません",["みません","みます","みる","みますか"],"ぜんぜん needs a negative verb."),
+   mc("ひるごはんを ＿。","Won't you have lunch (with me)?","たべませんか",["たべませんか","たべません","たべます","たべる"],"〜ませんか is a polite invitation."),
+   mc("ときどき うちで おんがくを ＿。","I sometimes listen to music at home.","ききます",["ききます","きます","きくます","きります"],"きく is a u-verb: く becomes き."),
+   mc("あまり ざっしを ＿。","I don't read magazines much.","よみません",["よみません","よみます","よむません","よません"],"あまり needs a negative verb; よむ becomes よみ."),
+   mc("がっこう＿ にほんごを べんきょうします。","I study Japanese at school.","で",["で","に","を","へ"],"Studying is an action, so its place takes で."),
+   mc("うちへ かえります。","How is the particle へ pronounced here?","e",["e","he","be","wa"],"As a particle, へ is read e."),
+   bd("I eat breakfast every day.",["わたしは","まいにち","あさごはんを","たべます"],[["まいにち","わたしは","あさごはんを","たべます"]]),
+   bd("I will go to school tomorrow.",["あした","がっこうに","いきます"],[["がっこうに","あした","いきます"]]),
+   bd("I read books at the library.",["としょかんで","ほんを","よみます"],[["ほんを","としょかんで","よみます"]]),
+   bd("I get up at 6 o'clock.",["わたしは","ろくじに","おきます"]),
+   bd("Won't you watch a movie this weekend?",["しゅうまつ","えいがを","みませんか"],[["えいがを","しゅうまつ","みませんか"]]),
+   bd("I don't drink tea much.",["わたしは","あまり","おちゃを","のみません"],[["わたしは","おちゃを","あまり","のみません"]])]
+};
+const VERBS = [["いく","いきます","to go"],["くる","きます","to come"],["かえる","かえります","to return"],["たべる","たべます","to eat"],["のむ","のみます","to drink"],["みる","みます","to watch"],["きく","ききます","to listen"],["よむ","よみます","to read"],["はなす","はなします","to speak"],["する","します","to do"],["おきる","おきます","to get up"],["ねる","ねます","to sleep"]];
+const IROW = {"う":"い","く":"き","ぐ":"ぎ","す":"し","つ":"ち","ぬ":"に","ぶ":"び","む":"み","る":"り"};
+function conjQuestion(v, neg){
+  const [d,masu,en]=v, stem=d.slice(0,-1), last=d.slice(-1);
+  const set=new Set([masu, stem+"ます", stem+(IROW[last]||"い")+"ます", d+"ます", stem+"います"]);
+  let o=[...set].slice(0,4);
+  const fix=s=>neg?s.replace(/ます$/,"ません"):s;
+  return mc(d+" → ?", "Polite "+(neg?"negative":"present")+" form of "+d+" ("+en+")", fix(masu), o.map(fix),
+    d==="する"||d==="くる" ? d+" is irregular." : (masu===stem+"ます" ? d+" is a ru-verb: drop る." : d+" is a u-verb: "+last+" becomes "+IROW[last]+"."));
+}
+
+const row=(s)=>s.split(" ").map(x=>[x[0],x.slice(1)]);
+const H_BASE=row("あa いi うu えe おo かka きki くku けke こko さsa しshi すsu せse そso たta ちchi つtsu てte とto なna にni ぬnu ねne のno はha ひhi ふfu へhe ほho まma みmi むmu めme もmo やya ゆyu よyo らra りri るru れre ろro わwa をwo んn");
+const H_VOICED=row("がga ぎgi ぐgu げge ごgo ざza じji ずzu ぜze ぞzo だda ぢji づzu でde どdo ばba びbi ぶbu べbe ぼbo ぱpa ぴpi ぷpu ぺpe ぽpo");
+const toKata=p=>[String.fromCharCode(p[0].charCodeAt(0)+0x60),p[1]];
+const KANA={hira:{base:H_BASE,voiced:H_VOICED},kata:{base:H_BASE.map(toKata),voiced:H_VOICED.map(toKata)}};
+
+const STAGES=[["N5","Genki I · lessons 1 to 12","about 800 words, 100 kanji"],["N4","Genki II · lessons 13 to 23","about 1,500 words, 300 kanji"],["N3","Quartet 1 or Tobira","about 3,700 words, 650 kanji"],["N2","Quartet 2 · Shin Kanzen Master","about 6,000 words, 1,000 kanji"],["職","Keigo, business Japanese, technical vocabulary","working in Japanese"]];
+
+/* ---------- State ---------- */
+const KEY="kotsukotsu.v1";
+const blank=()=>({v:1,srs:{},kana:{},gram:{},days:{},set:{npd:10,units:[1]},t:0});
+function norm(s){const b=blank();s=s&&typeof s==="object"?s:{};return {...b,...s,set:{...b.set,...(s.set||{})}};}
+let S=blank();
+try{const raw=localStorage.getItem(KEY);if(raw)S=norm(JSON.parse(raw));}catch(e){}
+const dayNow=()=>{const d=new Date();return Math.floor((d.getTime()-d.getTimezoneOffset()*6e4)/864e5);};
+const D=(n=dayNow())=>(S.days[n]||(S.days[n]={r:0,n:0,g:0,k:0}));
+const peek=n=>S.days[n]||{r:0,n:0,g:0,k:0};
+const total=d=>d.r+d.g+d.k;
+
+let sync="local", ref=null, saving=false, dirty=false, timer=null;
+function save(){
+  S.t=Date.now();
+  try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+  if(ref){clearTimeout(timer);timer=setTimeout(push,1500);}
+}
+async function push(){
+  if(!ref)return; if(saving){dirty=true;return;}
+  saving=true;
+  try{await ref.set({blob:JSON.stringify(S),t:S.t});sync="account";}catch(e){sync="local";}
+  saving=false; showSync();
+  if(dirty){dirty=false;push();}
+}
+async function initSync(){
+  try{
+    if(!window.claude||!window.claude.use)return;
+    const [db,user]=await Promise.all([window.claude.use("db"),window.claude.use("user")]);
+    if(!db||!user)return;
+    const id=await user.id(); if(!id)return;
+    const doc=db.doc("data/users/"+id+"/progress");
+    const snap=await Promise.race([doc.get(),new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),10000))]);
+    ref=doc; sync="account";
+    if(snap.exists){
+      const remote=norm(JSON.parse(snap.data().blob));
+      if((remote.t||0)>(S.t||0)){S=remote;try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){} resetSessions();render();}
+      else if((S.t||0)>(remote.t||0))push();
+    } else if(S.t)push();
+  }catch(e){sync="local";}
+  showSync();
+}
+function showSync(){const el=document.getElementById("sync");if(!el)return;el.className="sync"+(sync==="account"?" on":"");el.textContent=sync==="account"?"Progress saved to your account":"Progress saved on this device only";}
+
+/* ---------- Spaced repetition ---------- */
+function grade(s,g,t){
+  s=s?{...s}:{d:t,i:0,e:2.5,r:0,l:0};
+  if(g===0){if(s.i>0)s.l++;s.e=Math.max(1.3,s.e-0.2);s.i=0;s.d=t;}
+  else if(s.i===0){s.i=g===3?4:1;s.d=t+s.i;}
+  else{const m=g===1?1.2:g===2?s.e:s.e*1.3;s.i=Math.max(s.i+1,Math.round(s.i*m));if(g===1)s.e=Math.max(1.3,s.e-0.15);if(g===3)s.e+=0.15;s.d=t+s.i;}
+  s.e=Math.round(s.e*100)/100;s.r++;return s;
+}
+const activeDeck=()=>DECK.filter(c=>S.set.units.includes(c.u));
+function counts(extra=0){
+  const t=dayNow(),deck=activeDeck();
+  const due=deck.filter(c=>S.srs[c.id]&&S.srs[c.id].d<=t).sort((a,b)=>S.srs[a.id].d-S.srs[b.id].d);
+  const fresh=deck.filter(c=>!S.srs[c.id]).slice(0,Math.max(0,S.set.npd+extra-peek(t).n));
+  return {due,fresh,left:deck.filter(c=>!S.srs[c.id]).length};
+}
+const learned=()=>Object.keys(S.srs).filter(id=>CARD[id]&&S.srs[id].i>0);
+function streak(){let t=dayNow(),n=0;if(!total(peek(t)))t--;while(total(peek(t))>0){n++;t--;}return n;}
+const fmt=i=>i<=0?"today":i===1?"1 day":i<30?i+" days":Math.round(i/30)+" mo";
+
+/* ---------- Sessions (in memory) ---------- */
+let cs,gv,kv;
+function resetSessions(){cs={queue:null,shown:false,extra:0,day:dayNow()};gv={unit:S.set.units[S.set.units.length-1]||1,drill:null};kv={mode:"read",set:"hira",voiced:false,q:null,picked:null,wi:0,ghost:true};}
+resetSessions();
+function queue(){
+  if(!cs.queue||cs.day!==dayNow()){const c=counts(cs.extra);cs.queue=[...c.due,...c.fresh].map(c=>c.id);cs.day=dayNow();cs.shown=false;}
+  return cs.queue;
+}
+const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+
+/* ---------- Views ---------- */
+const $=id=>document.getElementById(id);
+const view=$("view");
+const route=()=>{const h=location.hash.slice(1);return ["today","cards","grammar","kana"].includes(h)?h:"today";};
+function render(){
+  const r=route();
+  document.querySelectorAll("nav a").forEach(a=>{if(a.dataset.tab===r)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");});
+  view.innerHTML=({today:vToday,cards:vCards,grammar:vGrammar,kana:vKana})[r]();
+  if(r==="kana"&&kv.mode==="write")initPad();
+  showSync();
+}
+function head(title,sub,seal){return `<div class="head"><div><h1>${title}</h1><p class="muted small">${sub}</p></div>${seal||""}</div>`;}
+
+function vToday(){
+  const t=dayNow(),d=peek(t),c=counts(),q=cs.queue&&cs.day===t?cs.queue.length:c.due.length+c.fresh.length;
+  const st=streak(),ln=learned(),words=ln.filter(id=>CARD[id].type==="word").length,kj=ln.length-words;
+  const cardsDone=q===0;
+  const task=(href,done,title,sub,pct,go)=>`<a class="task${done?" done":""}" href="${href}"><span class="tick">✓</span><span class="grow" style="flex:1;min-width:0"><strong>${title}</strong><span class="muted small num">${sub}</span>${pct==null?"":`<span class="bar"><i style="width:${Math.min(100,pct)}%"></i></span>`}</span><span class="go">${done?"Done":go}</span></a>`;
+  const days=[...Array(7)].map((_,i)=>t-6+i),max=Math.max(1,...days.map(n=>total(peek(n))));
+  const wk=days.map(n=>{const v=total(peek(n)),dt=new Date(n*864e5);return `<div class="${v?"":"zero"}${n===t?" now":""}"><span class="num">${v||""}</span><i style="height:${Math.round(v/max*56)}px"></i>${"SMTWTFS"[dt.getUTCDay()]}</div>`;}).join("");
+  const date=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
+  return head("こつこつ",`${date} · little by little`,`<div class="seal" aria-label="${st} day streak"><div><span class="num">${st}</span><small>DAYS</small></div></div>`)+
+  `<section class="stack"><h2>Today's hour</h2>
+    ${task("#cards",cardsDone,"Flashcards",cardsDone?`${d.r} reviews done today`:`${c.due.length} due · ${c.fresh.length} new`,null,"Review")}
+    ${task("#grammar",d.g>=10,"Grammar drill",`${Math.min(d.g,10)} of 10 answers`,d.g*10,"Practise")}
+    ${task("#kana",d.k>=20,"Kana and kanji",`${Math.min(d.k,20)} of 20 answers`,d.k*5,"Practise")}
+  </section>
+  <section class="card stack"><h2>Last 7 days · answers</h2><div class="week">${wk}</div></section>
+  <section class="card stack"><h2>Road to working Japanese</h2>
+    <p class="small muted num">${words} words and ${kj} kanji learned so far</p>
+    <div class="bar" style="margin:0"><i style="width:${Math.min(100,words/8)}%"></i></div>
+    <ol class="road">${STAGES.map((s,i)=>`<li class="${i===0?"here":""}"><span class="lv">${s[0]}</span><div><strong>${i===0?"You are here · ":""}${i===4?"Professional":"JLPT "+s[0]}</strong><span class="small">${s[1]}</span><br><span class="small muted">${s[2]}</span></div></li>`).join("")}</ol>
+  </section>
+  <section class="card set"><h2 style="margin-bottom:6px">Settings</h2>
+    ${[1,2,3].map(u=>`<label for="unit${u}"><span><strong>Unit ${u} · ${UNITS[u].name}</strong><br><span class="small muted">${UNITS[u].scope}${u===3?" · includes 15 kanji":""}</span></span><input type="checkbox" id="unit${u}" data-unit="${u}" ${S.set.units.includes(u)?"checked":""}></label>`).join("")}
+    <label for="npd"><span><strong>New cards per day</strong></span><select id="npd">${[5,10,15,20].map(n=>`<option ${S.set.npd===n?"selected":""}>${n}</option>`).join("")}</select></label>
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap;padding-top:10px;border-top:1px dashed var(--line)"><span id="sync" class="sync">Progress saved on this device only</span><button class="chip" data-act="reset" id="resetBtn">Reset progress</button></div>
+    <div class="row" style="flex-wrap:wrap;padding-top:10px"><button class="chip" data-act="export" id="exportBtn">Export backup</button><button class="chip" data-act="import" id="importBtn">Import backup</button><span class="small muted" id="backupMsg"></span><input type="file" id="importFile" accept="application/json,.json" hidden></div>
+  </section>`;
+}
+
+function vCards(){
+  const q=queue(),t=dayNow();
+  if(!q.length){
+    const c=counts(cs.extra),next=activeDeck().map(c=>S.srs[c.id]).filter(Boolean).map(s=>s.d-t).filter(n=>n>0).sort((a,b)=>a-b)[0];
+    return head("Cards","Spaced repetition")+`<div class="cell"><span class="tag">Queue empty</span><span class="glyph" style="font-size:56px">完了</span></div>
+    <p>Nothing left to review today.${next?` Next reviews arrive in ${fmt(next)}.`:""}</p>
+    ${c.left?`<button class="btn wide" data-act="more" id="moreBtn">Study 5 more new cards (${c.left} unseen)</button>`:`<p class="muted small">You have seen every card in your active units. Turn on the next unit under Today, Settings.</p>`}`;
+  }
+  const c=CARD[q[0]],s=S.srs[c.id],isNew=!s;
+  const size=c.front.length>7?34:c.front.length>4?46:c.type==="kanji"?110:64;
+  const pre=g=>fmt(grade(s,g,t).i);
+  return head("Cards",`<span class="num">${q.length}</span> left today`)+
+  `<div class="cell"><span class="tag">${isNew?"New":"Review"} · ${c.type==="kanji"?"kanji":"unit "+c.u}</span><span class="stamp">${c.type==="kanji"?"漢":"語"}</span><span class="glyph" lang="ja" style="font-size:${size}px">${c.front}</span></div>
+  ${cs.shown?`<div class="answer">${c.kj?`<span class="kj" lang="ja">${c.kj}</span>`:""}${c.read?`<span class="kj" lang="ja">${c.read}</span>`:""}<span class="en">${c.en}</span>${"speechSynthesis" in window?`<button class="chip" data-act="say" id="sayBtn" style="margin-top:6px">Listen</button>`:""}</div>
+  <div class="grades">${[["Again","soon"],["Hard",pre(1)],["Good",pre(2)],["Easy",pre(3)]].map((b,g)=>`<button class="btn g${g}" data-act="grade" data-g="${g}" id="grade${g}">${b[0]}<small class="num">${b[1]}</small></button>`).join("")}</div>`
+  :`<button class="btn primary wide" data-act="show" id="showBtn">Show answer</button><p class="muted small">Say the meaning out loud first, then check.</p>`}`;
+}
+
+function newDrill(u){
+  let pool=[...QUIZ[u]];
+  if(u===3)pool.push(...shuffle(VERBS).slice(0,5).map((v,i)=>conjQuestion(v,i%2===1)));
+  gv.drill={qs:shuffle(pool).slice(0,10).map(q=>q.t==="mc"?{...q,o:shuffle(q.o)}:{...q,pool:shuffle(q.tiles.map((w,i)=>({w,i}))),built:[]}),i:0,picked:null,score:0};
+}
+function vGrammar(){
+  const u=gv.unit,dr=gv.drill;
+  if(!dr){
+    const g=S.gram[u]||{c:0,w:0},tot=g.c+g.w;
+    return head("Grammar",`Unit ${u} · ${UNITS[u].name} · ${UNITS[u].scope}`)+
+    `<div class="chips">${[1,2,3].map(n=>`<button class="chip" data-act="unit" data-u="${n}" id="gu${n}" aria-pressed="${n===u}">Unit ${n}</button>`).join("")}</div>
+    <button class="btn primary wide" data-act="drill" id="drillBtn">Start a 10-question drill</button>
+    <p class="muted small num">${tot?`${Math.round(g.c/tot*100)}% correct over ${tot} answers in this unit`:"No answers yet in this unit"}</p>
+    <section class="card"><h2 style="margin-bottom:12px">Key points</h2>${NOTES[u].map((n,i)=>`<div class="note"><span class="n">${"一二三四五六"[i]}</span><span class="pat" lang="ja">${n[0]}</span><span class="ex" lang="ja">${n[1]}</span><span class="small muted">${n[2]}</span></div>`).join("")}</section>`;
+  }
+  if(dr.i>=dr.qs.length){
+    return head("Grammar",`Unit ${u} drill finished`)+`<div class="cell"><span class="tag">Score</span><span class="glyph num" style="font-size:64px">${dr.score} / ${dr.qs.length}</span></div>
+    <button class="btn primary wide" data-act="drill" id="againBtn">Another drill</button><button class="btn wide" data-act="notes" id="notesBtn">Back to key points</button>`;
+  }
+  const q=dr.qs[dr.i],done=dr.picked!==null;
+  let body;
+  if(q.t==="mc"){
+    body=`<div class="cell" style="min-height:150px"><span class="tag">Choose</span><span class="glyph" lang="ja" style="font-size:${q.q.length>16?24:30}px">${q.q}</span></div><p>${q.en}</p>
+    <div class="opts">${q.o.map((o,i)=>`<button class="opt${/[a-z(]/.test(o)?"":" jp"}${done&&o===q.a?" right":done&&o===dr.picked?" wrong":""}" data-act="pick" data-i="${i}" id="opt${i}" ${done?"disabled":""}>${o}</button>`).join("")}</div>`;
+  } else {
+    const used=new Set(q.built.map(b=>b.i));
+    body=`<p class="small muted">Build the sentence</p><p style="font-size:18px;font-weight:700">${q.en}</p>
+    <div class="tiles slot" lang="ja">${q.built.map((b,k)=>`<button class="tile" data-act="untile" data-k="${k}" id="bt${k}" ${done?"disabled":""}>${b.w}</button>`).join("")||`<span class="muted small">Tap the words in order</span>`}</div>
+    <div class="tiles" lang="ja">${q.pool.filter(p=>!used.has(p.i)).map(p=>`<button class="tile" data-act="tile" data-i="${p.i}" id="pt${p.i}" ${done?"disabled":""}>${p.w}</button>`).join("")}</div>
+    ${done?"":`<button class="btn primary wide" data-act="check" id="checkBtn" ${q.built.length===q.tiles.length?"":"disabled"}>Check</button>`}`;
+  }
+  const ok=dr.picked===true||dr.picked===q.a;
+  return head("Grammar",`Question <span class="num">${dr.i+1} of ${dr.qs.length}</span> · unit ${u}`)+body+
+  (done?`<div class="verdict ${ok?"ok":"no"}"><b>${ok?"Correct":"Not quite"}</b><span lang="ja">${q.t==="mc"?(ok?"":"Answer: "+q.a+". ")+q.why:(ok?"":"Answer: ")+q.tiles.join(" ")}</span></div><button class="btn primary wide" data-act="next" id="nextBtn">Next</button>`:"")+
+  `<button class="chip" data-act="notes" id="quitBtn" style="align-self:flex-start">Leave drill</button>`;
+}
+
+function kanaPool(){
+  if(kv.set==="kanji")return KANJI.map(k=>[k.front,k.read+" · "+k.en]);
+  const k=KANA[kv.set];return kv.voiced?[...k.base,...k.voiced]:k.base;
+}
+function newKanaQ(){
+  const pool=kanaPool(),w=pool.map(p=>{const s=S.kana[p[0]]||{c:0,w:0};return Math.max(.3,1+2*s.w-.25*s.c);});
+  let r=Math.random()*w.reduce((a,b)=>a+b,0),idx=0;for(;idx<pool.length-1;idx++){r-=w[idx];if(r<=0)break;}
+  if(kv.q&&pool[idx][0]===kv.q.ch)idx=(idx+1)%pool.length;
+  const ans=pool[idx],wrong=[];
+  for(const p of shuffle(pool)){if(p[1]!==ans[1]&&!wrong.includes(p[1]))wrong.push(p[1]);if(wrong.length===3)break;}
+  kv.q={ch:ans[0],a:ans[1],o:shuffle([ans[1],...wrong])};kv.picked=null;
+}
+function vKana(){
+  const sets=[["hira","Hiragana"],["kata","Katakana"],["kanji","Kanji"]];
+  const top=head("Kana and kanji",kv.mode==="read"?"Recognise the character":"Trace it with your finger")+
+  `<div class="chips">${[["read","Read"],["write","Write"]].map(m=>`<button class="chip" data-act="kmode" data-m="${m[0]}" id="km-${m[0]}" aria-pressed="${kv.mode===m[0]}">${m[1]}</button>`).join("")}<span style="flex:1"></span>${kv.set!=="kanji"?`<button class="chip jp" data-act="voiced" id="voicedBtn" aria-pressed="${kv.voiced}" aria-label="Include voiced kana">が ぱ</button>`:""}</div>
+  <div class="chips">${sets.map(s=>`<button class="chip" data-act="kset" data-s="${s[0]}" id="ks-${s[0]}" aria-pressed="${kv.set===s[0]}">${s[1]}</button>`).join("")}</div>`;
+  const pool=kanaPool();
+  if(kv.mode==="write"){
+    const p=pool[kv.wi%pool.length];
+    return top+`<div class="cell pad"><div class="ghost" lang="ja" id="ghost" style="${kv.ghost?"":"visibility:hidden"}">${p[0]}</div><canvas id="pad" aria-label="Drawing area"></canvas></div>
+    <p style="text-align:center"><strong style="font-size:20px">${p[1]}</strong> <span class="muted small num">· ${kv.wi%pool.length+1} of ${pool.length}</span></p>
+    <div class="row"><button class="btn grow" data-act="clear" id="clearBtn">Clear</button><button class="btn grow" data-act="ghost" id="ghostBtn">${kv.ghost?"Hide guide":"Show guide"}</button><button class="btn primary grow" data-act="wnext" id="wnextBtn">Next</button></div>
+    <p class="muted small">Trace with the guide, then hide it and write from memory. Stroke order is not shown here: follow the charts in your textbook.</p>`;
+  }
+  if(!kv.q||!pool.some(p=>p[0]===kv.q.ch))newKanaQ();
+  const q=kv.q,done=kv.picked!==null,tot=pool.reduce((a,p)=>{const s=S.kana[p[0]];return a+(s&&s.c>s.w?1:0);},0);
+  return top+`<div class="cell"><span class="tag num">${tot} of ${pool.length} solid</span><span class="glyph" lang="ja" style="font-size:120px;line-height:1.1">${q.ch}</span></div>
+  <div class="opts"${kv.set==="kanji"?' style="grid-template-columns:1fr"':""}>${q.o.map((o,i)=>`<button class="opt${done&&o===q.a?" right":done&&o===kv.picked?" wrong":""}" data-act="kpick" data-i="${i}" id="kopt${i}" ${done?"disabled":""}${kv.set==="kanji"?' style="font-size:17px" lang="ja"':""}>${o}</button>`).join("")}</div>
+  ${done?`<button class="btn primary wide" data-act="knext" id="knextBtn">Next</button>`:""}`;
+}
+
+/* ---------- Drawing pad ---------- */
+function initPad(){
+  const cv=$("pad");if(!cv)return;
+  const r=cv.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+  cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);
+  const ctx=cv.getContext("2d");ctx.scale(dpr,dpr);ctx.lineCap="round";ctx.lineJoin="round";ctx.lineWidth=Math.max(6,r.width/34);
+  ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue("--ink").trim()||"#14213d";
+  let on=false;const pos=e=>{const b=cv.getBoundingClientRect();return [e.clientX-b.left,e.clientY-b.top];};
+  cv.onpointerdown=e=>{on=true;try{cv.setPointerCapture(e.pointerId);}catch(_){}const [x,y]=pos(e);ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+.1,y+.1);ctx.stroke();e.preventDefault();};
+  cv.onpointermove=e=>{if(!on)return;const [x,y]=pos(e);ctx.lineTo(x,y);ctx.stroke();};
+  cv.onpointerup=cv.onpointercancel=()=>{on=false;};
+}
+
+/* ---------- Actions ---------- */
+let confirmReset=false;
+const ACT={
+  show(){cs.shown=true;render();},
+  say(){try{const c=CARD[queue()[0]],u=new SpeechSynthesisUtterance(c.type==="kanji"?c.read.split(" / ")[0]:c.front.split(" / ")[0]);u.lang="ja-JP";u.rate=.85;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}},
+  grade(el){
+    const g=+el.dataset.g,q=queue(),id=q.shift(),t=dayNow(),d=D(t);
+    if(!S.srs[id])d.n++;
+    S.srs[id]=grade(S.srs[id],g,t);d.r++;
+    if(g===0)q.splice(Math.min(q.length,3),0,id);
+    cs.shown=false;save();render();view.scrollTop=0;
+  },
+  more(){cs.extra+=5;cs.queue=null;render();},
+  unit(el){gv.unit=+el.dataset.u;render();},
+  drill(){newDrill(gv.unit);render();view.scrollTop=0;},
+  notes(){gv.drill=null;render();},
+  pick(el){const dr=gv.drill,q=dr.qs[dr.i];dr.picked=q.o[+el.dataset.i];gradeGrammar(dr.picked===q.a);},
+  tile(el){const q=gv.drill.qs[gv.drill.i];q.built.push(q.pool.find(p=>p.i===+el.dataset.i));render();},
+  untile(el){gv.drill.qs[gv.drill.i].built.splice(+el.dataset.k,1);render();},
+  check(){const dr=gv.drill,q=dr.qs[dr.i],got=q.built.map(b=>b.w).join("|");const ok=[q.tiles,...q.alt].some(a=>a.join("|")===got);dr.picked=ok?true:false;gradeGrammar(ok);},
+  next(){gv.drill.i++;gv.drill.picked=null;render();view.scrollTop=0;},
+  kmode(el){kv.mode=el.dataset.m;render();},
+  kset(el){kv.set=el.dataset.s;kv.q=null;kv.wi=0;render();},
+  voiced(){kv.voiced=!kv.voiced;kv.q=null;kv.wi=0;render();},
+  kpick(el){
+    const q=kv.q;kv.picked=q.o[+el.dataset.i];const ok=kv.picked===q.a,s=S.kana[q.ch]||(S.kana[q.ch]={c:0,w:0});
+    ok?s.c++:s.w++;D().k++;save();render();
+  },
+  knext(){newKanaQ();render();},
+  clear(){initPad();},
+  ghost(){kv.ghost=!kv.ghost;const g=$("ghost");g.style.visibility=kv.ghost?"":"hidden";$("ghostBtn").textContent=kv.ghost?"Hide guide":"Show guide";},
+  wnext(){kv.wi++;D().k++;save();render();},
+  export(){
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:"application/json"}));
+    a.download="kotsukotsu-backup-"+new Date().toISOString().slice(0,10)+".json";
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+    $("backupMsg").textContent="Backup file downloaded.";
+  },
+  import(){$("importFile").click();},
+  reset(el){
+    if(!confirmReset){confirmReset=true;el.textContent="Tap again to erase everything";setTimeout(()=>{confirmReset=false;if(el.isConnected)el.textContent="Reset progress";},4000);return;}
+    confirmReset=false;S=blank();resetSessions();save();render();
+  }
+};
+function gradeGrammar(ok){const dr=gv.drill,g=S.gram[gv.unit]||(S.gram[gv.unit]={c:0,w:0});ok?(g.c++,dr.score++):g.w++;D().g++;save();render();}
+document.addEventListener("click",e=>{const el=e.target.closest("[data-act]");if(el&&!el.disabled&&ACT[el.dataset.act])ACT[el.dataset.act](el);});
+document.addEventListener("change",e=>{
+  const el=e.target;
+  if(el.id==="importFile"){
+    const f=el.files[0];if(!f)return;
+    f.text().then(txt=>{
+      const data=JSON.parse(txt);
+      if(!data||typeof data.srs!=="object"||typeof data.days!=="object")throw new Error("bad file");
+      S=norm(data);resetSessions();save();render();$("backupMsg").textContent="Backup restored.";
+    }).catch(()=>{$("backupMsg").textContent="That file is not a Kotsukotsu backup.";});
+    return;
+  }
+  if(el.dataset.unit){const u=+el.dataset.unit;let us=S.set.units.filter(x=>x!==u);if(el.checked)us.push(u);if(!us.length){el.checked=true;return;}S.set.units=us.sort();cs.queue=null;save();render();}
+  else if(el.id==="npd"){S.set.npd=+el.value;cs.queue=null;save();render();}
+});
+window.addEventListener("hashchange",()=>{render();view.scrollTop=0;});
+render();
+initSync();
+// Installable app: offline cache, and ask the browser not to evict saved progress.
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+</script>
+</body>
+</html>
