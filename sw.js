@@ -1,6 +1,6 @@
 // Offline support: serve from cache first, refresh the cache in the background.
 // Bump CACHE when you want every device to drop old files immediately.
-const CACHE = "kotsukotsu-v2";
+const CACHE = "kotsukotsu-v3";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {
